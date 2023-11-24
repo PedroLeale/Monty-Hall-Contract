@@ -20,15 +20,17 @@ contract MontyHall {
   uint prize;
   uint collateral;
   uint openDoor;
+  uint startingStepTime;
+  uint timeLimit;
 
-  constructor(SimpleCommit door0, SimpleCommit door1, SimpleCommit door2, uint _collateral) payable {
-    doors[0] = door0;
-    doors[1] = door1;
-    doors[2] = door2;
+  constructor(SimpleCommit door0, SimpleCommit door1, SimpleCommit door2, uint _collateral, uint _timeLimit) payable {
+    doors = [door0, door1, door2];
     interviewer = msg.sender;
     currentStep = MontyHallStep.Bet;
     prize = msg.value;
     collateral = _collateral;
+    startingStepTime = block.timestamp;
+    timeLimit = _timeLimit;
   }
 
   modifier onlyInterviewer() {
@@ -51,6 +53,7 @@ contract MontyHall {
     selectedDoor = door;
 
     currentStep = MontyHallStep.Reveal;
+    startingStepTime = block.timestamp;
   }
 
   function getValue(uint door) public view uint8 {
@@ -71,6 +74,7 @@ contract MontyHall {
     }
     currentStep = MontyHallStep.Change;
     openDoor = door;
+    startingStepTime = block.timestamp;
   }
 
   function change(uint door) public onlyPlayer {
@@ -79,6 +83,7 @@ contract MontyHall {
     require(door != openDoor, "This is the Open Door");
     selectedDoor = door;
     currentStep = MontyHallStep.FinalReview;
+    startingStepTime = block.timestamp;
   }
 
   function isEverythingRevelead() public view bool {
@@ -108,5 +113,16 @@ contract MontyHall {
       currentStep = MontyHallStep.Done;
       player.send(prize+collateral);
     }
+  }
+
+  function reclaimTimeLimit() {
+    require(msg.sender == interviewer || msg.sender == player);
+    require(block.timestamp - startingStepTime > timeLimit, "Wait until time Limit is reached");
+    require(MontyHallStep.Done != currentStep, "Already ended");
+    if (msg.sender == interviewer) {
+      interviewer.send(collateral+prize);
+      return;
+    }
+    player.send(collateral+prize);
   }
 }

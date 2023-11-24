@@ -193,10 +193,21 @@ contract MontyHall {
             "Wait until time Limit is reached"
         );
         require(MontyHallStep.Done != currentStep, "Already ended");
-        if (msg.sender == interviewer) {
-            interviewer.transfer(collateral + prize);
+        if (currentStep == MontyHallStep.Bet) {
+            interviewer.send(collateral + prize);
             return;
         }
-        player.transfer(collateral + prize);
+        if (currentStep == MontyHallStep.Reveal) {
+            player.send(collateral + prize);
+            return;
+        }
+        if (currentStep == MontyHallStep.Change) {
+            interviewer.send(collateral + prize);
+            return;
+        }
+        if (currentStep == MontyHallStep.FinalReveal) {
+            player.send(collateral + prize);
+            return;
+        }
     }
 }

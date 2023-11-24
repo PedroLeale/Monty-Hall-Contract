@@ -253,4 +253,35 @@ contract MontyTest is Test {
         monty.reclaimTimeLimit();
     }
 
+    function testInterviewerReclaimsBeforeBet() public {
+        vm.warp(0 seconds);
+        vm.warp(1 days);
+        vm.prank(interviewer);
+        monty.reclaimTimeLimit();
+    }
+
+    function testInterviewerReclaimsAfterReveal() public {
+        vm.warp(0 seconds);
+        vm.prank(player);
+        monty.bet{value: collateral}(0);
+        vm.prank(interviewer);
+        monty.reveal(2, defaultNonce, 0);
+        vm.warp(1 days);
+        vm.prank(interviewer);
+        monty.reclaimTimeLimit();
+    }
+
+    function testInterviewerReclaimsAfterChange() public {
+        vm.warp(0 seconds);
+        vm.prank(player);
+        monty.bet{value: collateral}(0);
+        vm.prank(interviewer);
+        monty.reveal(2, defaultNonce, 0);
+        vm.prank(player);
+        monty.change(1);
+        vm.warp(1 days);
+        vm.prank(interviewer);
+        monty.reclaimTimeLimit();
+    }
+
 }

@@ -75,4 +75,66 @@ contract MontyTest is Test {
         assertGe(playerBalance_Before, player.balance);
     }
 
+    function testPlayerCheatCase() public {
+        vm.warp(0 seconds);
+        uint256 playerBalance_Before = player.balance;
+        uint256 interviewerBalance_Before = interviewer.balance;
+        // Player tries to cheat on bet 
+        vm.startPrank(player);
+
+        vm.expectRevert();
+        monty.reclaimTimeLimit();
+
+        vm.expectRevert();
+        monty.bet{value: collateral}(5555);
+        vm.expectRevert();
+        monty.bet{value: collateral/2}(5555);
+
+        // Plays normally so we can test the time limitations
+        monty.bet{value: collateral}(0);
+
+        vm.expectRevert();
+        monty.reclaimTimeLimit();
+        vm.stopPrank();
+
+        // Interviewer reveals door 2
+        vm.prank(interviewer);
+        monty.reveal(2, defaultNonce, 0);
+
+        // Player tries to cheat on change
+        vm.startPrank(player);
+
+        vm.expectRevert();
+        monty.change(2);
+        
+        vm.expectRevert();
+        monty.change(3);
+
+        // Plays normally
+        monty.change(0);
+        
+        vm.stopPrank();
+
+        assertEq(address(monty).balance, prize + collateral);
+
+        // Final reveal
+        vm.prank(interviewer);
+        monty.finalReveal(1, defaultNonce, 1);
+
+        vm.expectRevert();
+        vm.prank(player);
+        monty.change(1);
+
+        vm.prank(interviewer);
+        monty.finalReveal(0, defaultNonce, 0);
+
+        assertEq(interviewer.balance, interviewerBalance_Before);
+        assertGe(playerBalance_Before, player.balance);
+        vm.warp(2 days);
+
+        vm.prank(player);
+        vm.expectRevert();
+        monty.reclaimTimeLimit();
+    }
+
 }

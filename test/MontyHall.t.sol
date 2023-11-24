@@ -21,12 +21,18 @@ contract MontyTest is Test {
         bytes32 door1 = sha256(abi.encodePacked(defaultNonce, uint8(1)));
         bytes32 door2 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
         vm.prank(interviewer);
-        monty = new MontyHall{value: prize}(door0, door1, door2, collateral, 59 seconds);
+        monty = new MontyHall{value: prize}(
+            door0,
+            door1,
+            door2,
+            collateral,
+            59 seconds
+        );
     }
 
     function testPlayerWin() public {
         uint256 playerBalance_Before = player.balance;
-        // Player bets on door 0 
+        // Player bets on door 0
         vm.prank(player);
         monty.bet{value: collateral}(0);
 
@@ -52,7 +58,7 @@ contract MontyTest is Test {
     function testPlayerLoose() public {
         uint256 playerBalance_Before = player.balance;
         uint256 interviewerBalance_Before = interviewer.balance;
-        // Player bets on door 0 
+        // Player bets on door 0
         vm.prank(player);
         monty.bet{value: collateral}(0);
 
@@ -79,7 +85,7 @@ contract MontyTest is Test {
         vm.warp(0 seconds);
         uint256 playerBalance_Before = player.balance;
         uint256 interviewerBalance_Before = interviewer.balance;
-        // Player tries to cheat on bet 
+        // Player tries to cheat on bet
         vm.startPrank(player);
 
         vm.expectRevert();
@@ -88,7 +94,7 @@ contract MontyTest is Test {
         vm.expectRevert();
         monty.bet{value: collateral}(5555);
         vm.expectRevert();
-        monty.bet{value: collateral/2}(5555);
+        monty.bet{value: collateral / 2}(5555);
 
         // Plays normally so we can test the time limitations
         monty.bet{value: collateral}(0);
@@ -106,13 +112,13 @@ contract MontyTest is Test {
 
         vm.expectRevert();
         monty.change(2);
-        
+
         vm.expectRevert();
         monty.change(3);
 
         // Plays normally
         monty.change(0);
-        
+
         vm.stopPrank();
 
         assertEq(address(monty).balance, prize + collateral);
@@ -130,7 +136,7 @@ contract MontyTest is Test {
 
         assertEq(interviewer.balance, interviewerBalance_Before);
         assertGe(playerBalance_Before, player.balance);
-        
+
         // Tries to cheat post game
         vm.warp(2 days);
         vm.prank(player);
@@ -145,11 +151,17 @@ contract MontyTest is Test {
         bytes32 door1 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
         bytes32 door2 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
         vm.prank(interviewer);
-        MontyHall montyCheat = new MontyHall{value: prize}(door0, door1, door2, collateral, 59 seconds);
+        MontyHall montyCheat = new MontyHall{value: prize}(
+            door0,
+            door1,
+            door2,
+            collateral,
+            59 seconds
+        );
 
         uint256 playerBalance_Before = player.balance;
         uint256 interviewerBalance_Before = interviewer.balance;
-        // Player bets on door 0 
+        // Player bets on door 0
         vm.prank(player);
         montyCheat.bet{value: collateral}(0);
 
@@ -177,16 +189,17 @@ contract MontyTest is Test {
         vm.warp(0 seconds);
         uint256 playerBalance_Before = player.balance;
         uint256 interviewerBalance_Before = interviewer.balance;
-        // Player bets on door 0 
+        // Player bets on door 0
         vm.prank(player);
         monty.bet{value: collateral}(0);
 
         // Interviewer reveals door 2
         vm.startPrank(interviewer);
-        monty.reveal(2, defaultNonce, 0); 
+        monty.reveal(2, defaultNonce, 0);
 
         vm.expectRevert();
         monty.reclaimTimeLimit();
+        vm.stopPrank();
 
         // Player changes to door 1
         vm.prank(player);
@@ -205,7 +218,7 @@ contract MontyTest is Test {
         monty.finalReveal(2, defaultNonce, 0);
 
         monty.finalReveal(1, defaultNonce, 0); // Game ends here
-                                            // when interviewer tries to reveal with the wrong value
+        // when interviewer tries to reveal with the wrong value
         vm.expectRevert();
         monty.finalReveal(1, defaultNonce, 1);
         vm.stopPrank();
@@ -283,5 +296,4 @@ contract MontyTest is Test {
         vm.prank(interviewer);
         monty.reclaimTimeLimit();
     }
-
 }

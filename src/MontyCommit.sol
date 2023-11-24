@@ -31,7 +31,7 @@ library SimpleCommit {
     }
 
     function isRevealed(CommitType storage c) public view returns (bool) {
-        return c.verified;
+        return c.verified; // so verificar sem revert
     }
 
     function isCorrect(CommitType storage c) public view returns (bool) {

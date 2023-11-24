@@ -5,25 +5,25 @@ import "./MontyCommit.sol";
 
 contract MontyHall {
     enum MontyHallStep {
-        Bet,
-        Reveal,
-        Change,
-        FinalReveal,
-        Done
+        Bet, // player deve apostar em porta
+        Reveal, // entrevistador revela
+        Change, // player pode mudar
+        FinalReveal, // entrevistador tem de revelar todas outras portas
+        Done // finalizado
     }
 
     address payable interviewer;
     address payable player;
-    SimpleCommit.CommitType[] doors;
-    uint selectedDoor = 0;
+    SimpleCommit.CommitType[] doors; // array de commits -> hash das portas
+    uint selectedDoor = 0; // porta do player
 
     MontyHallStep currentStep;
 
     uint prize;
     uint collateral;
-    uint openDoor;
-    uint startingStepTime;
-    uint timeLimit;
+    uint openDoor; // porta que foi aberta
+    uint startingStepTime; // tempo inicial da CURRENTSTEP
+    uint timeLimit; // tempo limite de cada *ETAPA*
 
     event EverythingRevelead();
     event PlayerWon();
@@ -65,8 +65,11 @@ contract MontyHall {
         SimpleCommit.commit(doors[2], door2);
         interviewer = payable(msg.sender);
         currentStep = MontyHallStep.Bet;
+
+        // como o interviewer ja passou o premio pro contrato, ele nao paga collateral, mas deve indicar quanto eh
         prize = msg.value;
         collateral = _collateral;
+
         startingStepTime = block.timestamp;
         timeLimit = _timeLimit;
     }
@@ -82,21 +85,22 @@ contract MontyHall {
     }
 
     function bet(uint door) public payable {
-        require(door >= 0 && door <= 2, "Door Range 0, 1 and 2");
+        require(door >= 0 && door <= 2, "Door Range 0, 1 and 2"); // porta valida
         require(
-            currentStep == MontyHallStep.Bet,
+            currentStep == MontyHallStep.Bet, // estado de aposta
             "Should be in betting state!"
         );
         require(
-            player == address(0x0) || player == msg.sender,
+            player == address(0x0) || player == msg.sender, // player deve estar resetado/ser ele mesmo
             "Already have a player!"
         );
-        require(msg.value >= collateral, "Should transfer collateral");
+        require(msg.value >= collateral, "Should transfer collateral"); // deve pagar collateral
 
+        // seta o player e aposta
         player = payable(msg.sender);
         selectedDoor = door;
 
-        currentStep = MontyHallStep.Reveal;
+        currentStep = MontyHallStep.Reveal; // avanca
         startingStepTime = block.timestamp;
     }
 
@@ -117,13 +121,14 @@ contract MontyHall {
             currentStep == MontyHallStep.Reveal,
             "Should be in the first reveal state"
         );
-        SimpleCommit.reveal(doors[door], nonce, v);
+        SimpleCommit.reveal(doors[door], nonce, v); // revelar
         if (!SimpleCommit.isCorrect(doors[door]) || isDoorPrizeable(door)) {
+            // se revelar falso, cheatou, paga o player para puni-lo
             player.transfer(prize);
             currentStep = MontyHallStep.Done;
             return false;
         }
-        currentStep = MontyHallStep.Change;
+        currentStep = MontyHallStep.Change; // avanca para escolha do player
         openDoor = door;
         startingStepTime = block.timestamp;
         return true;
@@ -131,15 +136,16 @@ contract MontyHall {
 
     function change(uint door) public onlyPlayer {
         require(currentStep == MontyHallStep.Change, "Must be in change step");
-        require(door >= 0 && door <= 2, "Door Range 0, 1 and 2");
-        require(door != openDoor, "This is the Open Door");
-        selectedDoor = door;
-        currentStep = MontyHallStep.FinalReveal;
+        require(door >= 0 && door <= 2, "Door Range 0, 1 and 2"); // door valida
+        require(door != openDoor, "This is the Open Door"); // nao pode tentar colocar na porta aberta...
+        selectedDoor = door; // escolhe a que ele pedir (mesmo que seja a mesma)
+        currentStep = MontyHallStep.FinalReveal; // avanca...
         startingStepTime = block.timestamp;
     }
 
     function isEverythingRevelead() public view returns (bool) {
         bool everythingRevelead = true;
+        // verificar se todos estão revelados
         for (uint8 i = 0; i < 3; i++) {
             everythingRevelead =
                 everythingRevelead &&
@@ -148,6 +154,7 @@ contract MontyHall {
         return everythingRevelead;
     }
 
+    // entrevistador revela UMA A UMA
     function finalReveal(
         uint door,
         bytes32 nonce,
@@ -160,32 +167,42 @@ contract MontyHall {
 
         SimpleCommit.reveal(doors[door], nonce, v);
         if (!SimpleCommit.isCorrect(doors[door])) {
+            // se revelar falso, deve punir entrevistador
             player.transfer(prize + collateral);
             currentStep = MontyHallStep.Done;
             return;
         }
 
+        // caso sseja ultimo reveal faltante
         if (isEverythingRevelead()) {
             emit EverythingRevelead();
             bool atLeastOneIsPrizeable = false;
+            // verificar que pelo menos um premio foi verdadeiro, se nao eh sacanagem com jogador...
             for (uint8 i = 0; i < 3; i++) {
                 atLeastOneIsPrizeable =
                     atLeastOneIsPrizeable ||
                     isDoorPrizeable(i);
             }
+            // caso onde entrevistador foi honesto e jogador errou
             if (atLeastOneIsPrizeable && !isDoorPrizeable(selectedDoor)) {
-                currentStep = MontyHallStep.Done;
-                player.send(collateral);
-                interviewer.send(prize);
+                currentStep = MontyHallStep.Done; // acabar
+                player.send(collateral); // devolver collateral porque foi honesto
+                interviewer.send(prize); // pagar entrevistador
                 emit InterviewWon();
                 return;
             }
-            currentStep = MontyHallStep.Done;
+            currentStep = MontyHallStep.Done; // senao... acabar e devolver collateral + premio
             player.send(prize + collateral);
             emit PlayerWon();
         }
     }
 
+    /**
+     * Permitir reclamar apenas:
+     * * Caso tenha ultrapassado tempo limite
+     * * Seja parte envolvida
+     * * Devolver de acordo COM O ESTADO ATUAL (ja que apenas um deve agir por estado...)
+     */
     function reclaimTimeLimit() public {
         require(msg.sender == interviewer || msg.sender == player);
         require(

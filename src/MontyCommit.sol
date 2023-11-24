@@ -30,6 +30,10 @@ library SimpleCommit {
         }
     }
 
+    function isRevealed(CommitType storage c) public view returns (bool) {
+        return c.verified;
+    }
+
     function isCorrect(CommitType storage c) public view returns (bool) {
         require(c.myState == CommitStatesType.Revealed, "Wait!");
         return c.verified;

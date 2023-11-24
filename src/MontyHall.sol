@@ -159,6 +159,11 @@ contract MontyHall {
         );
 
         SimpleCommit.reveal(doors[door], nonce, v);
+        if (!SimpleCommit.isCorrect(doors[door])) {
+            player.transfer(prize + collateral);
+            currentStep = MontyHallStep.Done;
+            return;
+        }
 
         if (isEverythingRevelead()) {
             emit EverythingRevelead();

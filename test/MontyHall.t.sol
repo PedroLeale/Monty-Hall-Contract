@@ -130,9 +130,92 @@ contract MontyTest is Test {
 
         assertEq(interviewer.balance, interviewerBalance_Before);
         assertGe(playerBalance_Before, player.balance);
+        
+        // Tries to cheat post game
         vm.warp(2 days);
-
         vm.prank(player);
+        vm.expectRevert();
+        monty.reclaimTimeLimit();
+    }
+
+    function testInterviewerCheatsOnDoors() public {
+        vm.deal(interviewer, 100 ether);
+        vm.deal(player, 100 ether);
+        bytes32 door0 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
+        bytes32 door1 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
+        bytes32 door2 = sha256(abi.encodePacked(defaultNonce, uint8(0)));
+        vm.prank(interviewer);
+        MontyHall montyCheat = new MontyHall{value: prize}(door0, door1, door2, collateral, 59 seconds);
+
+        uint256 playerBalance_Before = player.balance;
+        uint256 interviewerBalance_Before = interviewer.balance;
+        // Player bets on door 0 
+        vm.prank(player);
+        montyCheat.bet{value: collateral}(0);
+
+        // Interviewer reveals door 2
+        vm.prank(interviewer);
+        montyCheat.reveal(2, defaultNonce, 0);
+
+        // Player changes to door 1
+        vm.prank(player);
+        montyCheat.change(1);
+
+        assertEq(address(montyCheat).balance, prize + collateral);
+
+        // Final reveal
+        vm.prank(interviewer);
+        montyCheat.finalReveal(0, defaultNonce, 0);
+        vm.prank(interviewer);
+        montyCheat.finalReveal(1, defaultNonce, 0);
+
+        assertGe(player.balance, playerBalance_Before);
+        assertLe(interviewer.balance, interviewerBalance_Before);
+    }
+
+    function testInterviewerCheats() public {
+        vm.warp(0 seconds);
+        uint256 playerBalance_Before = player.balance;
+        uint256 interviewerBalance_Before = interviewer.balance;
+        // Player bets on door 0 
+        vm.prank(player);
+        monty.bet{value: collateral}(0);
+
+        // Interviewer reveals door 2
+        vm.startPrank(interviewer);
+        monty.reveal(2, defaultNonce, 0); 
+
+        vm.expectRevert();
+        monty.reclaimTimeLimit();
+
+        // Player changes to door 1
+        vm.prank(player);
+        monty.change(1);
+
+        vm.prank(interviewer);
+        vm.expectRevert();
+        monty.reveal(1, defaultNonce, 1);
+
+        assertEq(address(monty).balance, prize + collateral);
+
+        // Final reveal
+        vm.startPrank(interviewer);
+        monty.finalReveal(0, defaultNonce, 0);
+        vm.expectRevert();
+        monty.finalReveal(2, defaultNonce, 0);
+
+        monty.finalReveal(1, defaultNonce, 0); // Game ends here
+                                            // when interviewer tries to reveal with the wrong value
+        vm.expectRevert();
+        monty.finalReveal(1, defaultNonce, 1);
+        vm.stopPrank();
+
+        assertGe(player.balance, playerBalance_Before);
+        assertLe(interviewer.balance, interviewerBalance_Before);
+
+        // Tries to cheat post game
+        vm.warp(2 days);
+        vm.prank(interviewer);
         vm.expectRevert();
         monty.reclaimTimeLimit();
     }
